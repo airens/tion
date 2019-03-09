@@ -1,5 +1,5 @@
-#Tion Api
-This package provedes RESTful API to control Tion breezer
+# Tion Api
+This package provides API to control Tion breezer
 ## Getting authorization code:
 - Go to <https://magicair.tion.ru/dashboard/overview>
 - Login if needed
