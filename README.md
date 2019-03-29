@@ -1,11 +1,5 @@
 # Tion Api
 This package provides API to control Tion breezer
-## Getting authorization code:
-- Go to <https://magicair.tion.ru/dashboard/overview>
-- Login if needed
-- Enter *Debug mode* (usually F12) in browser
-- Open *Network* tab and change some parameter of your breezer via web-interface
-- Look into header of request and copy *Authorization* field 
 ## Usage:
 ```python
 import os
