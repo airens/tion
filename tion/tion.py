@@ -1,5 +1,6 @@
 import requests
-
+from os import path
+from time import time, sleep
 
 class TionConnection:
     def __init__(self, data: dict):
@@ -396,19 +397,157 @@ class Tion:
         """
 
 
-class BreezerParams:
-    def __init__(self):
+class Zone:
+    def __init__(self, zone: TionZones, api):
+        self.api = api
+        self.guid = None
+        self.name = None
+        self.mode = None
+        self.target_co2 = None
+        self.load(zone)
+
+    def __repr__(self):
+        return f"Zone({self.name}, mode={self.mode}, valid={self.valid})"
+
+    def load(self, zone_data: TionZones=None) -> bool:
+        if not zone_data:
+            zones = self.api._get_zones_data(guid=self.guid)
+            if zones:
+                zone_data = zones[0]
+        self.guid = zone_data.guid
+        self.name = zone_data.name
+        self.mode = zone_data.mode.current
+        self.target_co2 = zone_data.mode.auto_set.co2
+        return self.valid
+
+    def send(self) -> bool:
+        if not self.valid:
+            return False
+        data = {
+            "mode": self.mode if self.mode in ("auto", "manual") else "manual",
+            "co2": int(self.target_co2)
+        }
+        url = f"https://api2.magicair.tion.ru/zone/{self.guid}/mode"
+        js = requests.post(url, json=data, headers=self.api.headers).json()
+        status = js["status"]
+        if status != "queued":
+            print("TionApi auto set " + status + ": " + js["description"])
+            return False
+        return True
+
+    @property
+    def valid(self):
+        return None not in [value for __, value in self.__dict__.items()]
+
+
+class MagicAir(TionZonesDevices):
+    def __init__(self, device: TionZonesDevices, zone: Zone, api):
+        self.name = device.name
+        self.guid = device.guid
+        self.zone = zone
+        self.api = api
+        self.co2 = None
+        self.temperature = None
+        self.humidity = None
+        self.load(device)
+
+    def __repr__(self):
+        return f"MagicAir({self.name}, valid = {self.valid})"
+
+    @property
+    def valid(self):
+        return None not in [value for __, value in self.__dict__.items()]
+
+    def load(self, device_data: TionZonesDevices=None):
+        if not device_data:
+            devices = self.api.get_devices(guid=self.guid)
+            if devices:
+                device_data = devices[0]
+        data: TionZonesDevicesData = device_data.data
+        self.co2 = data.co2
+        self.temperature = data.temperature
+        self.humidity = data.humidity
+        return self.valid
+
+
+class Breezer(TionZonesDevices):
+    def __init__(self, device: TionZonesDevices, zone: Zone, api):
+        self.name = device.name
+        self.guid = device.guid
+        self.zone = zone
+        self.api = api
+        self.t_in = None
+        self.t_out = None
+        self.filter_need_replace = None
+        self.data_valid = None
         self.is_on = None
         self.heater_enabled = None
         self.t_set = None
         self.speed = None
         self.speed_min_set = None
         self.speed_max_set = None
+        self.load(device)
+
+    def __repr__(self):
+        return f"Breezer({self.name}, valid = {self.valid})"
+
+    def send(self) -> bool:
+        if not self.valid:
+            return False
+        data = {
+            "is_on": bool(self.is_on),
+            "heater_enabled": bool(self.heater_enabled),
+            "t_set": int(self.t_set + 0.5),
+            "speed": int(self.speed + 0.5),
+            "speed_min_set": int(self.speed_min_set + 0.5),
+            "speed_max_set": int(self.speed_max_set + 0.5)
+        }
+        url = f"https://api2.magicair.tion.ru/device/{self.guid}/mode"
+        js = requests.post(url, json=data, headers=self.api.headers).json()
+        status = js["status"]
+        if status != "queued":
+            print("TionApi parameters set " + status + ": " + js["description"])
+            return False
+        return True
+
+    @property
+    def valid(self):
+        return None not in [value for __, value in self.__dict__.items()] and self.data_valid
+
+    def load(self, device_data: TionZonesDevices=None):
+        if not device_data:
+            devices, _ = self.api._get_devices_data(guid=self.guid)
+            if devices:
+                device_data = devices[0]
+        data: TionZonesDevicesData = device_data.data
+        self.data_valid = data.data_valid
+        self.is_on = data.is_on
+        self.heater_enabled = data.heater_enabled
+        self.t_set = data.t_set
+        self.speed = data.speed
+        self.speed_min_set = data.speed_min_set
+        self.speed_max_set = data.speed_max_set
+        self.t_in = data.t_in
+        self.t_out = data.t_out
+        self.filter_need_replace = data.filter_need_replace
+        return self.valid
 
 
 class TionApi:
-    def __init__(self, auth_code: str):
-        self.authorization = auth_code
+    auth_fname = "tion_auth"
+
+    def __init__(self, email: str, password: str, save_auth=True):
+        self._email = email
+        self._password = password
+        self._save_auth = save_auth
+        if self._save_auth and path.exists(TionApi.auth_fname):
+            with open(TionApi.auth_fname) as file:
+                self.authorization = file.read()
+        else:
+            self.authorization = None
+            self._get_authorization()
+        self._last_update = 0
+        self._data: Tion = None
         self.headers = {
             "Accept": "application/json, text/plain, */*",
             "Accept-Encoding": "gzip, deflate",
@@ -421,42 +560,144 @@ class TionApi:
             "Referer": "https://magicair.tion.ru/dashboard/overview",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2486.0 Safari/537.36 Edge/13.10586"
         }
+        self.get_data()
+
+    def __repr__(self):
+        return f"TionApi({self.authorization}, data={'Tion()' if self._data else None})"
+
+    def _get_authorization(self):
+        data = {
+            "username": self._email,
+            "password": self._password,
+            "client_id": "cd594955-f5ba-4c20-9583-5990bb29f4ef",
+            "client_secret": "syRxSrT77P",
+            "grant_type": "password"
+        }
+        try:
+            response = requests.post("https://api2.magicair.tion.ru/idsrv/oauth2/token", data=data)
+            if response.status_code == 200:
+                js = response.json()
+                self.authorization = f"{js['token_type']} {js['access_token']}"
+                if self._save_auth:
+                    with open(TionApi.auth_fname, "w") as file:
+                        file.write(self.authorization)
+                print("Got new token")
+                return True
+            else:
+                print(f"Status code while getting token: {response.status_code}!")
+                return False
+        except Exception as e:
+            print(f"Exception while getting token!\n{e}")
+            return False
 
     def get_data(self) -> Tion:
+        if (time() - self._last_update) < 1:  # update only once per second
+            return True
         url = "https://api2.magicair.tion.ru/location"
-        return Tion(requests.get(url, headers=self.headers).json()[0])
-
-    def set_auto_mode(self, zone: TionZones, active: bool, co2: int = None):
-        if not co2:
-            co2 = zone.mode.auto_set.co2
-        if type(co2) == float:
-            co2 = int(co2)
-        data = {
-            "mode": "auto" if active else "manual",
-            "co2": co2
-        }
-        url = f"https://api2.magicair.tion.ru/zone/{zone.guid}/mode"
-        js = requests.post(url, json=data, headers=self.headers).json()
-        status = js["status"]
-        if status != "queued":
-            print("TionApi auto set " + status + ": " + js["description"])
-            return False
-        return True
-
-    def set_breezer_params(self, device: TionZonesDevices, params: BreezerParams) -> bool:
-        data = {}
-        attrs = [attr for attr in params.__dir__() if not attr.startswith("_")]
-        for attr in attrs:
-            val = params.__getattribute__(attr)
-            if val is not None:
-                data[attr] = val
+        self._data = None
+        try:
+            response = requests.get(url, headers=self.headers)
+            if response.status_code == 200:
+                self._data: Tion = Tion(response.json()[0])
+                self._last_update = time()
+                return True
             else:
-                val = device.data.__getattribute__(attr)
-                data[attr] = int(val) if type(val) == float else val
-        url = f"https://api2.magicair.tion.ru/device/{device.guid}/mode"
-        js = requests.post(url, json=data, headers=self.headers).json()
-        status = js["status"]
-        if status != "queued":
-            print("TionApi parameters set " + status + ": " + js["description"])
+                if response.status_code == 401:
+                    if self._get_authorization():
+                        return self.get_data()
+                    else:
+                        print("Authorization failed!")
+                else:
+                    print("Status code while getting data is {response.status_code}!")
+                return False
+        except Exception as e:
+            print(f"Exception while getting data!\n{e}")
             return False
-        return True
+
+
+    def _get_zones_data(self, name_part: str=None, guid: str=None) -> list:
+        result = []
+        if self.get_data():
+            for zone in self._data.zones:
+                if any([
+                    not name_part and not guid,
+                    guid and zone.guid == guid,
+                    name_part and name_part.lower() in zone.name.lower()
+                        ]):
+                    result.append(zone)
+        return result
+
+    def get_zones(self, name_part: str=None, guid: str=None) -> list:
+        zones_data = self._get_zones_data(name_part, guid)
+        result = []
+        for zone_data in zones_data:
+            result.append(Zone(zone_data, self))
+        return result
+
+    def _get_devices_data(self, name_part: str=None, guid: str=None, type: str=None) -> list:
+        devices_data = []
+        zones = []
+        if self.get_data():
+            for zone in self._data.zones:
+                for device in zone.devices:
+                    if any([
+                            not name_part and not guid and not type,
+                            guid and device.guid == guid,
+                            name_part and name_part.lower() in device.name.lower(),
+                            type and type.lower() in device.type.lower()
+                           ]):
+                        devices_data.append(device)
+                        zones.append(zone)
+        return devices_data, zones
+
+    def get_devices(self, name_part: str=None, guid: str=None, type: str=None) -> list:
+        devices_data, zones = self._get_devices_data(name_part, guid, type)
+        result = []
+        for device_data, zone in zip(devices_data, zones):
+            if "co2mb" in device_data.type:
+                result.append(MagicAir(device_data, zone, self))
+            elif "breezer" in device_data.type:
+                result.append(Breezer(device_data, zone, self))
+            else:
+                assert False, f"Unknown device type {device_data.type}!"
+        return result
+
+"""
+import os
+from time import sleep
+from tion import TionApi, Breezer, Zone, MagicAir
+# initialization api
+email, password = os.environ.get("TION_AUTH").split(',')
+api = TionApi(email, password)
+# getting current co2 level from magicair
+magicair = api.get_devices(name_part="magic")[0]
+print(magicair.co2)
+sleep(3)
+# setting manual mode for zone Гостиная
+zone = api.get_zones(name_part="Гостиная")[0]
+zone.mode = "manual"
+zone.send()
+sleep(3)
+zone.load()
+assert zone.mode == "manual"  # making sure that mode is set correctly
+# turning off breezer
+breezer = api.get_devices(name_part="breezer")[0]
+breezer.is_on = False
+breezer.send()
+sleep(3)
+breezer.load()
+assert zone.mode == "manual"  # making sure that mode is set correctly
+# setting auto mode for zone Гостиная
+zone.mode = "auto"
+zone.send()
+sleep(3)
+zone.load()
+assert zone.mode == "auto"
+# setting breezer minimum speed to 3 and maximum to 6
+breezer.speed_min_set = 3
+breezer.speed_max_set = 6
+breezer.send()
+sleep(3)
+breezer.load()
+assert breezer.speed_min_set == 3
+"""

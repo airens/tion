@@ -1,66 +1,104 @@
-from tion import TionApi, BreezerParams
-from tion.tion import Tion
+from tion import TionApi, Breezer, Zone, MagicAir
+import copy
 from time import sleep
 
-def test_init(tion: TionApi):
-    assert tion.authorization, "authorization must be set!"
-    assert tion.headers, "headers must be set!"
+
+def test_api_init(api: TionApi):
+    assert api.authorization, "Authorisation failed!"
+    assert api._data, "No data got!!"
 
 
-saved_params = {}
+# def test_api_getting_data_interval(api: TionApi):
+#     api.get_data()
+#     time1 = api._data.connection.last_packet_time
+#     api.get_data()
+#     time2 = api._data.connection.last_packet_time
+#     assert time1 == time2, "Api must update data no more than once per second!"
+#     sleep(2)
+#     api.get_data()
+#     time3 = api._data.connection.last_packet_time
+#     assert time3 > time2, "Api must update data once per second!"
 
 
-def test_get_data(data: Tion):
-    assert data.zones[1].devices[0].data.co2, "Failed to get co2!"
-    assert data.zones[1].devices[0].data.temperature, "Failed to get temperature!"
-    assert data.zones[1].devices[0].data.humidity, "Failed to get humidity!"
-    saved_params["mode"] = data.zones[1].mode.current
-    saved_params["co2_set"] = data.zones[1].mode.auto_set.co2
-    saved_params["is_on"] = data.zones[1].devices[1].data.is_on
-    saved_params["heater_enabled"] = data.zones[1].devices[1].data.heater_enabled
-    saved_params["t_set"] = data.zones[1].devices[1].data.t_set
-    saved_params["speed"] = data.zones[1].devices[1].data.speed
-    saved_params["speed_min_set"] = data.zones[1].devices[1].data.speed_min_set
-    saved_params["speed_max_set"] = data.zones[1].devices[1].data.speed_max_set
-
-def return_prev_params(tion, data):
-    tion.set_auto_mode(data.zones[1], saved_params["mode"], saved_params["co2_set"])
-    params = BreezerParams()
-    params.is_on = saved_params["is_on"]
-    params.heater_enabled = saved_params["heater_enabled"]
-    params.t_set = saved_params["t_set"]
-    params.speed = saved_params["speed"]
-    params.speed_min_set = saved_params["speed_min_set"]
-    params.speed_max_set = saved_params["speed_max_set"]
-
-    tion.set_breezer_params(data.zones[1].devices[1], params)
+def test_zone_init(zone: Zone):
+    assert zone.valid, "Data not loaded properly!"
 
 
-def test_set(tion: TionApi, data: Tion):
-    new_mode = "manual" if saved_params["mode"] == "auto" else "auto"
-    new_co2 = 600 if saved_params["co2_set"] != 600 else 700
-    new_min_speed = 0 if saved_params["speed_min_set"] > 0 else 1
-    new_max_speed = 6 if saved_params["speed_max_set"] < 6 else 5
-    new_is_on = False if saved_params["is_on"] else True
-    new_heater_enabled = False if saved_params["heater_enabled"] else True
-    new_t_set = 15 if saved_params["heater_enabled"] != 15 else 20
-    new_speed = 3 if saved_params["speed"] != 3 else 2
-    tion.set_auto_mode(data.zones[1], True if new_mode == "auto" else False, new_co2)
-    params = BreezerParams()
-    params.is_on = new_is_on
-    params.heater_enabled = new_heater_enabled
-    params.t_set = new_t_set
-    params.speed = new_speed
-    params.speed_max_set = new_max_speed
-    params.speed_min_set = new_min_speed
-    tion.set_breezer_params(data.zones[1].devices[1], params)
-    sleep(2)
-    data = tion.get_data()
-    assert new_mode == data.zones[1].mode.current, "Failed to set auto mode!"
-    assert new_is_on == data.zones[1].devices[1].data.is_on, "Failed to set is_on!"
-    assert new_heater_enabled == data.zones[1].devices[1].data.heater_enabled, "Failed to set heater_enabled!"
-    assert new_t_set == data.zones[1].devices[1].data.t_set, "Failed to set t_set!"
-    assert new_speed == data.zones[1].devices[1].data.speed, "Failed to set speed!"
-    assert new_min_speed == data.zones[1].devices[1].data.speed_min_set, "Failed to set speed_min_set!"
-    assert new_max_speed == data.zones[1].devices[1].data.speed_max_set, "Failed to set speed_max_set!"
-    return_prev_params(tion, data)
+def test_zone_send(zone: Zone):
+    zone_prev = copy.deepcopy(zone)
+    zone.mode = "auto" if zone.mode == "manual" else "manual"
+    zone.target_co2 = 900 if zone.target_co2 != 900 else 901
+    zone.send()
+    sleep(3)  # wait for update
+    zone.load()
+    assert zone.mode != zone_prev.mode, "Failed to set zone mode!"
+    assert zone.mode != zone_prev.target_co2, "Failed to set zone mode!"
+    zone_prev.send()  # return to prev values
+    sleep(3)
+    zone.load()
+    assert zone_prev.mode == zone.mode, "Failed to return mode to previous value!"
+    assert zone_prev.target_co2 == zone.target_co2, "Failed to return co2 to previous value!"
+
+
+def test_breezer_init(breezer: Breezer):
+    assert breezer.valid, "Data not loaded properly!"
+
+
+def test_breezer_manual_send(breezer: Breezer, zone: Zone):
+    zone_mode_prev = zone.mode
+    if zone.mode != "manual":
+        zone.mode = "manual"
+        zone.send()
+        sleep(3)
+    breezer_prev = copy.deepcopy(breezer)
+    breezer.is_on = True if not breezer.is_on else False
+    breezer.heater_enabled = True if not breezer.heater_enabled else False
+    breezer.t_set = 15 if breezer.t_set != 15 else 14
+    breezer.speed = 1 if breezer.speed != 1 else 2
+    breezer.send()
+    sleep(3)  # wait for update
+    breezer.load()
+    assert breezer.is_on != breezer_prev.is_on, "Failed to set breezer is_on!"
+    assert breezer.heater_enabled != breezer_prev.heater_enabled, "Failed to set breezer heater_enabled!"
+    assert breezer.t_set != breezer_prev.t_set, "Failed to set breezer t_set!"
+    assert breezer.speed != breezer_prev.speed, "Failed to set breezer speed!"
+    breezer_prev.send()  # return to prev values
+    sleep(3)
+    breezer.load()
+    assert breezer.is_on == breezer_prev.is_on, "Failed to set breezer is_on!"
+    assert breezer.heater_enabled == breezer_prev.heater_enabled, "Failed to set breezer heater_enabled!"
+    assert breezer.t_set == breezer_prev.t_set, "Failed to set breezer t_set!"
+    assert breezer.speed == breezer_prev.speed, "Failed to set breezer speed!"
+    if zone.mode != zone_mode_prev:
+        zone.mode = zone_mode_prev
+        zone.send()
+        sleep(3)
+
+
+def test_breezer_auto_send(breezer: Breezer, zone: Zone):
+    zone_mode_prev = zone.mode
+    if zone.mode != "auto":
+        zone.mode = "auto"
+        zone.send()
+        sleep(3)
+    breezer_prev = copy.deepcopy(breezer)
+    breezer.speed_max_set = 6 if breezer.speed_max_set != 6 else 5
+    breezer.speed_min_set = 0 if breezer.speed_min_set != 0 else 1
+    breezer.send()
+    sleep(3)  # wait for update
+    breezer.load()
+    assert breezer.speed_max_set != breezer_prev.speed_max_set, "Failed to set breezer speed_max_set!"
+    assert breezer.speed_min_set != breezer_prev.speed_min_set, "Failed to set breezer speed_min_set!"
+    breezer_prev.send()  # return to prev values
+    sleep(3)
+    breezer.load()
+    assert breezer.speed_max_set == breezer_prev.speed_max_set, "Failed to set breezer speed_max_set!"
+    assert breezer.speed_min_set == breezer_prev.speed_min_set, "Failed to set breezer speed_min_set!"
+    if zone.mode != zone_mode_prev:
+        zone.mode = zone_mode_prev
+        zone.send()
+        sleep(3)
+
+
+def test_magicair_init(magicair: MagicAir):
+    assert magicair.valid, "Data not loaded properly!"
