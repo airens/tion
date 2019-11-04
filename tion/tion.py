@@ -654,7 +654,7 @@ class TionApi:
         devices_data, zones = self._get_devices_data(name_part, guid, type)
         result = []
         for device_data, zone in zip(devices_data, zones):
-            if "co2mb" in device_data.type:
+            if "co2" in device_data.type:
                 result.append(MagicAir(device_data, zone, self))
             elif "breezer" in device_data.type:
                 result.append(Breezer(device_data, zone, self))
