@@ -436,7 +436,7 @@ class TionApi:
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2486.0 Safari/537.36 Edge/13.10586"
         }
 
-    def __repr__(self):  # pragma: no cover
+    def __repr__(self):
         return f"TionApi({self.authorization}, data={'Tion()' if self._data else None})"
 
     def _get_authorization(self):
@@ -506,7 +506,7 @@ class TionApi:
                         return False
                 else:  # pragma: no cover
                     _LOGGER.warning("Status code while getting data is {response.status_code}!")
-                return False
+                    return False
         except requests.exceptions.RequestException as e:  # pragma: no cover
             _LOGGER.error(f"Exception while getting data!\n{e}")
             return False
@@ -559,24 +559,32 @@ class TionApi:
 
 class Zone:
     def __init__(self, zone_data: TionZones, api: TionApi):
-        self.api = api
-        self.guid = None
-        self.name = None
+        self._api = api
+        self._guid = None
+        self._name = None
         self.mode = None
         self.target_co2 = None
         self.load(zone_data)
 
-    def __repr__(self):  # pragma: no cover
+    @property
+    def guid(self):
+        return self._guid
+    
+    @property
+    def name(self):
+        return self._name
+    
+    def __repr__(self):
         return f"Zone({self.name}, mode={self.mode}, valid={self.valid})"
 
     def load(self, zone_data: TionZones=None, force=False) -> bool:
         if not zone_data:
-            zones = self.api._get_zones_data(guid=self.guid, force=force)
+            zones = self._api._get_zones_data(guid=self.guid, force=force)
             if zones:
                 zone_data = zones[0]
         if zone_data:
-            self.guid = zone_data.guid
-            self.name = zone_data.name
+            self._guid = zone_data.guid
+            self._name = zone_data.name
             self.mode = zone_data.mode.current
             self.target_co2 = zone_data.mode.auto_set.co2
         return self.valid
@@ -590,7 +598,7 @@ class Zone:
         }
         url = f"https://api2.magicair.tion.ru/zone/{self.guid}/mode"
         try:
-            js = requests.post(url, json=data, headers=self.api.headers, timeout=10)
+            js = requests.post(url, json=data, headers=self._api.headers, timeout=10)
         except requests.exceptions.RequestException as e:  # pragma: no cover
             _LOGGER.error(f"Exception while sending new zone data!:\n{e}")  # pragma: no cover
             return False  # pragma: no cover
@@ -600,7 +608,7 @@ class Zone:
             _LOGGER.info("TionApi auto set " + status + ": " + js["description"])  # pragma: no cover
             return False  # pragma: no cover
         else:
-            return self.api.wait_for_task(js["task_id"])
+            return self._api.wait_for_task(js["task_id"])
 
     @property
     def valid(self):
@@ -609,16 +617,36 @@ class Zone:
 
 class MagicAir(TionZonesDevices):
     def __init__(self, device: TionZonesDevices, zone_data: TionZones, api: TionApi):
-        self.name = device.name
-        self.guid = device.guid
-        self.zone:Zone = Zone(zone_data, api)
-        self.api: TionApi = api
-        self.co2 = None
-        self.temperature = None
-        self.humidity = None
+        self._name = device.name
+        self._guid = device.guid
+        self._zone: Zone = Zone(zone_data, api)
+        self._api: TionApi = api
+        self._co2 = None
+        self._temperature = None
+        self._humidity = None
         self.load(device)
 
-    def __repr__(self):  # pragma: no cover
+    @property
+    def guid(self):
+        return self._guid
+    
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def co2(self):
+        return self._co2
+
+    @property
+    def temperature(self):
+        return self._temperature
+
+    @property
+    def humidity(self):
+        return self._humidity
+
+    def __repr__(self):
         return f"MagicAir({self.name}, valid = {self.valid})"
 
     @property
@@ -627,56 +655,103 @@ class MagicAir(TionZonesDevices):
 
     def load(self, device_data: TionZonesDevices=None, force=False):
         if not device_data:
-            devices, _ = self.api._get_devices_data(guid=self.guid, force=force)
+            devices, _ = self._api._get_devices_data(guid=self.guid, force=force)
             if devices:
                 device_data = devices[0]
         if device_data:
             data: TionZonesDevicesData = device_data.data
-            self.co2 = data.co2
-            self.temperature = data.temperature
-            self.humidity = data.humidity
+            self._guid = device_data.guid
+            self._name = device_data.name
+            self._co2 = data.co2
+            self._temperature = data.temperature
+            self._humidity = data.humidity
         return self.valid
 
 
 class Breezer(TionZonesDevices):
     def __init__(self, device: TionZonesDevices, zone_data: TionZones, api: TionApi):
-        self.name = device.name
-        self.guid = device.guid
+        self._name = device.name
+        self._guid = device.guid
         self.zone: Zone = Zone(zone_data, api)
-        self.api: TionApi = api
-        self.t_in = None
-        self.t_out = None
-        self.filter_need_replace = None
-        self.data_valid = None
-        self.is_on = None
-        self.heater_installed = None
+        self._api: TionApi = api
+        self._t_in = None
+        self._t_out = None
+        self._filter_need_replace = None
+        self._data_valid = None
+        self._is_on = None
+        self._heater_installed = None
         self.heater_enabled = None
         self.t_set = None
-        self.t_min = None
-        self.t_max = None
+        self._t_min = None
+        self._t_max = None
         self.speed = None
         self.speed_min_set = None
         self.speed_max_set = None
-        self.speed_limit = None
+        self._speed_limit = None
         self.load(device)
 
-    def __repr__(self):  # pragma: no cover
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def guid(self):
+        return self._guid
+
+    @property
+    def t_in(self):
+        return self._t_in
+
+    @property
+    def t_out(self):
+        return self._t_out
+
+    @property
+    def filter_need_replace(self):
+        return self._filter_need_replace
+
+    @property
+    def data_valid(self):
+        return self._data_valid
+
+    @property
+    def is_on(self):
+        return self._is_on
+
+    @property
+    def heater_installed(self):
+        return self._heater_installed
+
+    @property
+    def t_min(self):
+        return self._t_min
+
+    @property
+    def t_max(self):
+        return self._t_max
+
+    @property
+    def speed_limit(self):
+        return self._speed_limit
+
+    def __repr__(self):
         return f"Breezer({self.name}, valid = {self.valid})"
 
     def send(self) -> bool:
         if not self.valid:
             return False
+        speed = int(self.speed + 0.5)
         data = {
-            "is_on": bool(self.is_on),
+            "is_on": True if speed > 0 else False,
             "heater_enabled": bool(self.heater_enabled),
             "t_set": int(self.t_set + 0.5),
-            "speed": int(self.speed + 0.5),
+            "speed": speed,
             "speed_min_set": int(self.speed_min_set + 0.5),
             "speed_max_set": int(self.speed_max_set + 0.5)
         }
-        url = f"https://api2.magicair.tion.ru/device/{self.guid}/mode"
+        url = f"https://api2.magicair.tion.ru/device/{self._guid}/mode"
         try:
-            js = requests.post(url, json=data, headers=self.api.headers, timeout=10)
+            js = requests.post(url, json=data, headers=self._api.headers, timeout=10)
         except requests.exceptions.RequestException as e:  # pragma: no cover
             _LOGGER.error(f"Exception while sending new breezer data!:\n{e}")  # pragma: no cover
             return False  # pragma: no cover
@@ -686,33 +761,35 @@ class Breezer(TionZonesDevices):
             _LOGGER.error("TionApi parameters set " + status + ": " + js["description"])  # pragma: no cover
             return False  # pragma: no cover
         else:
-            return self.api.wait_for_task(js["task_id"])
+            return self._api.wait_for_task(js["task_id"])
 
     @property
     def valid(self):
-        return None not in [value for __, value in self.__dict__.items()] and self.data_valid
+        return None not in [value for __, value in self.__dict__.items()] and self._data_valid
 
     def load(self, device_data: TionZonesDevices=None, force=False):
         if not device_data:
-            devices, _ = self.api._get_devices_data(guid=self.guid, force=force)
+            devices, _ = self._api._get_devices_data(guid=self._guid, force=force)
             if devices:
                 device_data = devices[0]
         if device_data:
             data: TionZonesDevicesData = device_data.data
-            self.data_valid = data.data_valid
-            self.is_on = data.is_on
-            self.heater_installed = data.heater_installed
+            self._guid = device_data.guid
+            self._name = device_data.name
+            self._data_valid = data.data_valid
+            self._is_on = data.is_on
+            self._heater_installed = data.heater_installed
             self.heater_enabled = data.heater_enabled
             self.t_set = data.t_set
             self.speed = data.speed
             self.speed_min_set = data.speed_min_set
             self.speed_max_set = data.speed_max_set
-            self.t_in = data.t_in
-            self.t_out = data.t_out
-            self.filter_need_replace = data.filter_need_replace
-            self.speed_limit = data.speed_limit
-            self.t_max = device_data.t_max
-            self.t_min = device_data.t_min
+            self._t_in = data.t_in
+            self._t_out = data.t_out
+            self._filter_need_replace = data.filter_need_replace
+            self._speed_limit = data.speed_limit
+            self._t_max = device_data.t_max
+            self._t_min = device_data.t_min
         return self.valid
 
 
@@ -735,11 +812,7 @@ def main():
     breezer.zone.mode = "manual"
     assert breezer.zone.send() is True, "Failed to send zone data"
     print(f"breezer.zone.mode: {breezer.zone.mode}")
-    # turning off breezer
-    breezer.is_on = False
-    assert breezer.send() is True, "Failed to send breezer data"
-    print(f"breezer.is_on: {breezer.is_on}")
-    # setting breezer speed manually and turn it on
+    # setting breezer speed manually
     breezer.speed = 3
     assert breezer.send() is True, "Failed to send breezer data"
     print(f"breezer.is_on: {breezer.is_on} breezer.speed: {breezer.speed}")
@@ -755,4 +828,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main()  # pragma: no cover
