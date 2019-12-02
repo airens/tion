@@ -3,40 +3,38 @@ This package provides API to control Tion breezer
 ## Usage:
 ```python
 import os
-from time import sleep
+import logging
 from tion import TionApi, Breezer, Zone, MagicAir
+
+logging.basicConfig(level=logging.INFO)
+
 # initialization api
 email, password = os.environ.get("TION_AUTH").split(',')
-api = TionApi(email, password)
+api = TionApi(email, password, save_auth=False)
 # getting current co2 level from magicair
 magicair = api.get_devices(name_part="magic")[0]
-print(magicair.co2)
-sleep(3)
-# setting manual mode for zone Гостиная
-zone = api.get_zones(name_part="Гостиная")[0]
-zone.mode = "manual"
-zone.send()
-sleep(3)
-zone.load()
-assert zone.mode == "manual"  # making sure that mode is set correctly
-# turning off breezer
+print(f"magicair.co2: {magicair.co2}")
+# getting breezer
 breezer = api.get_devices(name_part="breezer")[0]
+# setting manual mode for breezer zone
+breezer.zone.mode = "manual"
+assert breezer.zone.send() is True, "Failed to send zone data"
+print(f"breezer.zone.mode: {breezer.zone.mode}")
+# turning off breezer
 breezer.is_on = False
-breezer.send()
-sleep(3)
-breezer.load()
-assert zone.mode == "manual"  # making sure that mode is set correctly
-# setting auto mode for zone Гостиная
-zone.mode = "auto"
-zone.send()
-sleep(3)
-zone.load()
-assert zone.mode == "auto"
+assert breezer.send() is True, "Failed to send breezer data"
+print(f"breezer.is_on: {breezer.is_on}")
+# setting breezer speed manually and turn it on
+breezer.speed = 3
+assert breezer.send() is True, "Failed to send breezer data"
+print(f"breezer.is_on: {breezer.is_on} breezer.speed: {breezer.speed}")
+# setting auto mode for breezer's zone
+breezer.zone.mode = "auto"
+assert breezer.zone.send() is True, "Failed to send zone data"
+print(f"breezer.zone.mode: {breezer.zone.mode}")
 # setting breezer minimum speed to 3 and maximum to 6
 breezer.speed_min_set = 3
 breezer.speed_max_set = 6
-breezer.send()
-sleep(3)
-breezer.load()
-assert breezer.speed_min_set == 3
+assert breezer.send() is True, "Failed to send breezer data"
+print(f"breezer.speed_min_set: {breezer.speed_min_set} breezer.speed_max_set: {breezer.speed_max_set}")
 ```
