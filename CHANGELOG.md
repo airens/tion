@@ -5,10 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-update
-usage example
-## [0.5] - 2019-01-12
+## [0.6] - 2019-12-02
+
+### Changed
+- `Breezer` parameter `is_on` now can't be set mannualy and calculated automatically depending on the speed
+- all parameters of `Zone`, `MagicAir` and `Breezer`, that can't be changed, became `@property`
+
+## [0.5] - 2019-12-01
 
 ### Added
 - `min_update_interval` option for TionApi class
