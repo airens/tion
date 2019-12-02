@@ -1,4 +1,4 @@
-from tion import TionApi, Breezer, Zone, MagicAir
+from tion import TionApi, Breezer, Zone, MagicAir, main
 import copy
 from time import sleep
 
@@ -20,6 +20,10 @@ def test_api_init(api: TionApi):
     assert api.authorization, "Authorisation failed!"
     assert api._data, "No data got!!"
     sleep(TESTS_DELAY)  # let the server "rest"
+
+
+def test_api_repr(api: TionApi):
+    assert repr(api)
 
 
 def test_tion_api_need_new_auth(api: TionApi):
@@ -48,6 +52,12 @@ def test_zone_init(zone: Zone):
 def test_zone_load(zone: Zone):
     assert zone.load() is True, "Failed to load zone data!"
     sleep(TESTS_DELAY)  # let the server "rest"
+
+
+def test_zone_properties_and_repr(zone: Zone):
+    assert zone.guid == zone._guid
+    assert zone.name == zone._name
+    assert repr(zone)
 
 
 def test_zone_not_send_if_not_valid(zone: Zone):
@@ -79,6 +89,21 @@ def test_breezer_init(breezer: Breezer):
     sleep(TESTS_DELAY)  # let the server "rest"
 
 
+def test_breezer_properties_and_repr(breezer: Breezer):
+    assert breezer.name == breezer._name
+    assert breezer.guid == breezer._guid
+    assert breezer.t_in == breezer._t_in
+    assert breezer.t_out == breezer._t_out
+    assert breezer.filter_need_replace == breezer._filter_need_replace
+    assert breezer.data_valid == breezer._data_valid
+    assert breezer.is_on == breezer._is_on
+    assert breezer.heater_installed == breezer._heater_installed
+    assert breezer.t_min == breezer._t_min
+    assert breezer.t_max == breezer._t_max
+    assert breezer.speed_limit == breezer._speed_limit
+    assert repr(breezer)
+
+
 def test_breezer_not_send_if_not_valid(breezer: Breezer):
     breezer.speed = None
     assert breezer.send() is False, "Should'nt have sent not valid breezer!"
@@ -87,14 +112,6 @@ def test_breezer_not_send_if_not_valid(breezer: Breezer):
 
 def test_breezer_load(breezer: Breezer):
     assert breezer.load() is True, "Failed to load breezer data!"
-    sleep(TESTS_DELAY)  # let the server "rest"
-
-
-def test_breezer_manual_send_is_on(breezer_manual: Breezer):
-    new_is_on = True if not breezer_manual.is_on else False
-    breezer_manual.is_on = new_is_on
-    breezer_manual.send()
-    assert breezer_manual.is_on == new_is_on, "Couldn't set is on!"
     sleep(TESTS_DELAY)  # let the server "rest"
 
 
@@ -142,9 +159,22 @@ def test_magicair_init(magicair: MagicAir):
     sleep(TESTS_DELAY)  # let the server "rest"
 
 
+def test_magicair_properties_and_repr(magicair: MagicAir):
+    assert magicair.name == magicair._name
+    assert magicair.guid == magicair._guid
+    assert magicair.co2 == magicair._co2
+    assert magicair.temperature == magicair._temperature
+    assert magicair.humidity == magicair._humidity
+    assert repr(magicair)
+
+
 def test_magicair_load(magicair: MagicAir):
     assert magicair.load()
     sleep(TESTS_DELAY)  # let the server "rest"
+
+
+def test_example():
+    main()
 
 
 def test_restore_breezer():
