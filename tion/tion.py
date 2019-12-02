@@ -487,7 +487,7 @@ class TionApi:
 
     def get_data(self, force=False) -> bool:
         if not force and (time() - self._last_update) < self._min_update_interval:  # update only once per {min_update_interval} seconds
-            return True
+            return self._data is not None
         url = "https://api2.magicair.tion.ru/location"
         self._data = None
         try:
