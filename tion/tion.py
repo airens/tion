@@ -458,7 +458,7 @@ class TionApi:
                 _LOGGER.info("Got new token")
                 return True
             else:  # pragma: no cover
-                _LOGGER.error(f"Status code while getting token: {response.status_code}!")
+                _LOGGER.error(f"Status code while getting token: {response.status_code}, content:\n{response.json()}!")
                 return False
         except requests.exceptions.RequestException as e:  # pragma: no cover
             _LOGGER.error(f"Exception while getting token!\n{e}")
@@ -480,7 +480,7 @@ class TionApi:
                 else:
                     sleep(DELAY)
             else:  # pragma: no cover
-                _LOGGER.warning(f"Bad response code {response.status_code} in wait_for_task")
+                _LOGGER.warning(f"Bad response code {response.status_code} in wait_for_task, content:\n{response.json()}")
                 return False
         _LOGGER.warning(f"Couldn't get completed status for {max_time}sec in wait_for_task")  # pragma: no cover
         return False  # pragma: no cover
@@ -505,7 +505,7 @@ class TionApi:
                         _LOGGER.error("Authorization failed!")
                         return False
                 else:  # pragma: no cover
-                    _LOGGER.warning("Status code while getting data is {response.status_code}!")
+                    _LOGGER.warning("Status code while getting data is {response.status_code}, content:\n{response.json()}!")
                     return False
         except requests.exceptions.RequestException as e:  # pragma: no cover
             _LOGGER.error(f"Exception while getting data!\n{e}")
