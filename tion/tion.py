@@ -781,7 +781,7 @@ class Breezer(TionZonesDevices):
             self._heater_installed = data.heater_installed
             self.heater_enabled = data.heater_enabled
             self.t_set = data.t_set
-            self.speed = data.speed
+            self.speed = data.speed if self._is_on else 0  # Tion gives speed 1 even if it's off
             self.speed_min_set = data.speed_min_set
             self.speed_max_set = data.speed_max_set
             self._t_in = data.t_in
