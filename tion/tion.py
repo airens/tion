@@ -569,11 +569,11 @@ class Zone:
     @property
     def guid(self):
         return self._guid
-    
+
     @property
     def name(self):
         return self._name
-    
+
     def __repr__(self):
         return f"Zone({self.name}, mode={self.mode}, valid={self.valid})"
 
@@ -629,7 +629,7 @@ class MagicAir(TionZonesDevices):
     @property
     def guid(self):
         return self._guid
-    
+
     @property
     def name(self):
         return self._name
@@ -745,7 +745,7 @@ class Breezer(TionZonesDevices):
             "is_on": True if speed > 0 else False,
             "heater_enabled": bool(self.heater_enabled),
             "t_set": int(self.t_set + 0.5),
-            "speed": speed,
+            "speed": speed if speed > 0 else 1,
             "speed_min_set": int(self.speed_min_set + 0.5),
             "speed_max_set": int(self.speed_max_set + 0.5)
         }
