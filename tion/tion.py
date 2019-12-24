@@ -687,6 +687,7 @@ class Breezer(TionZonesDevices):
         self.speed = None
         self.speed_min_set = None
         self.speed_max_set = None
+        self.gate = None  # air source: 0 - inside, 1 - combined, 2 - outside
         self._speed_limit = None
         self.load(device)
 
@@ -749,6 +750,8 @@ class Breezer(TionZonesDevices):
             "speed_min_set": int(self.speed_min_set + 0.5),
             "speed_max_set": int(self.speed_max_set + 0.5)
         }
+        if self.zone.mode == "manual" and self.gate is not None:
+            data["gate"] = self.gate
         url = f"https://api2.magicair.tion.ru/device/{self._guid}/mode"
         try:
             js = requests.post(url, json=data, headers=self._api.headers, timeout=10)
@@ -784,6 +787,7 @@ class Breezer(TionZonesDevices):
             self.speed = data.speed if self._is_on else 0  # Tion gives speed 1 even if it's off
             self.speed_min_set = data.speed_min_set
             self.speed_max_set = data.speed_max_set
+            self.gate = data.gate
             self._t_in = data.t_in
             self._t_out = data.t_out
             self._filter_need_replace = data.filter_need_replace
@@ -816,6 +820,10 @@ def main():
     breezer.speed = 3
     assert breezer.send() is True, "Failed to send breezer data"
     print(f"breezer.is_on: {breezer.is_on} breezer.speed: {breezer.speed}")
+    # setting air source to outside
+    breezer.gate = 2
+    assert breezer.send() is True, "Failed to send breezer data"
+    print(f"breezer.is_on: {breezer.is_on} breezer.speed: {breezer.speed} breezer.gate: {breezer.gate}")
     # setting auto mode for breezer's zone
     breezer.zone.mode = "auto"
     assert breezer.zone.send() is True, "Failed to send zone data"

@@ -20,10 +20,14 @@ breezer = api.get_devices(name_part="breezer")[0]
 breezer.zone.mode = "manual"
 assert breezer.zone.send() is True, "Failed to send zone data"
 print(f"breezer.zone.mode: {breezer.zone.mode}")
-# setting breezer speed manually and turn it on
+# setting breezer speed manually
 breezer.speed = 3
 assert breezer.send() is True, "Failed to send breezer data"
 print(f"breezer.is_on: {breezer.is_on} breezer.speed: {breezer.speed}")
+# setting air source to outside
+breezer.gate = 2
+assert breezer.send() is True, "Failed to send breezer data"
+print(f"breezer.is_on: {breezer.is_on} breezer.speed: {breezer.speed} breezer.gate: {breezer.gate}")
 # setting auto mode for breezer's zone
 breezer.zone.mode = "auto"
 assert breezer.zone.send() is True, "Failed to send zone data"

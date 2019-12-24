@@ -154,6 +154,14 @@ def test_breezer_auto_send_speed_min_set(breezer_auto: Breezer):
     sleep(TESTS_DELAY)  # let the server "rest"
 
 
+def test_breezer_manual_send_gate(breezer_manual: Breezer):
+    new_gate = 0 if breezer_manual.gate != 0 else 2
+    breezer_manual.gate = new_gate
+    breezer_manual.send()
+    assert breezer_manual.gate == new_gate, "Failed to set breezer gate!"
+    sleep(TESTS_DELAY)  # let the server "rest"
+
+
 def test_magicair_init(magicair: MagicAir):
     assert magicair.valid, "Data not loaded properly!"
     sleep(TESTS_DELAY)  # let the server "rest"
