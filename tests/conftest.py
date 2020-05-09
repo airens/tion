@@ -6,8 +6,12 @@ from tion import TionApi, Breezer, Zone, MagicAir
 @pytest.fixture
 def api_no_saved_auth() -> TionApi:
     email, password = os.environ.get("TION_AUTH").split(',')
-    return TionApi(email, password, save_auth=False)
+    return TionApi(email, password, auth_fname=None)
 
+@pytest.fixture
+def api_bad_auth_fname() -> TionApi:
+    email, password = os.environ.get("TION_AUTH").split(',')
+    return TionApi(email, password, auth_fname="a:\\tion_auth")
 
 @pytest.fixture
 def api() -> TionApi:

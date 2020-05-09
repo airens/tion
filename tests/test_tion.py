@@ -12,7 +12,12 @@ TESTS_DELAY = 1
 
 def test_api_init_no_saved_auth(api_no_saved_auth: TionApi):
     assert api_no_saved_auth.authorization, "Authorisation failed!"
-    assert api_no_saved_auth._data, "No data got!!"
+    assert api_no_saved_auth._data, "No data got!"
+    sleep(TESTS_DELAY)  # let the server "rest"
+
+
+def test_tion_api_bad_auth_fname(api_bad_auth_fname: TionApi):
+    assert api_bad_auth_fname.get_data(force=True) is True, "Should've get data!"
     sleep(TESTS_DELAY)  # let the server "rest"
 
 

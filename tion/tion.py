@@ -403,15 +403,13 @@ class Tion:
 
 
 class TionApi:
-    auth_fname = "tion_auth"
-
-    def __init__(self, email: str, password: str, save_auth=True, min_update_interval_sec=10):
+    def __init__(self, email: str, password: str, auth_fname="tion_auth", min_update_interval_sec=10):
         self._email = email
         self._password = password
-        self._save_auth = save_auth
+        self._auth_fname = auth_fname
         self._min_update_interval = min_update_interval_sec
-        if self._save_auth and path.exists(TionApi.auth_fname):
-            with open(TionApi.auth_fname) as file:
+        if self._auth_fname and path.exists(self._auth_fname):
+            with open(self._auth_fname) as file:
                 self.authorization = file.read()
         else:
             self.authorization = None
@@ -452,9 +450,12 @@ class TionApi:
             if response.status_code == 200:
                 js = response.json()
                 self.authorization = f"{js['token_type']} {js['access_token']}"
-                if self._save_auth:
-                    with open(TionApi.auth_fname, "w") as file:
-                        file.write(self.authorization)
+                if self._auth_fname:
+                    try:
+                        with open(self._auth_fname, "w") as file:
+                            file.write(self.authorization)
+                    except Exception as e:
+                        _LOGGER.error(f"Unable to write authorization data to {self._auth_fname}: {e}!")
                 _LOGGER.info("Got new token")
                 return True
             else:  # pragma: no cover
@@ -480,7 +481,7 @@ class TionApi:
                 else:
                     sleep(DELAY)
             else:  # pragma: no cover
-                _LOGGER.warning(f"Bad response code {response.status_code} in wait_for_task, content:\n{response.json()}")
+                _LOGGER.warning(f"Bad response code {response.status_code} in wait_for_task, content:\n{response.text}")
                 return False
         _LOGGER.warning(f"Couldn't get completed status for {max_time}sec in wait_for_task")  # pragma: no cover
         return False  # pragma: no cover
@@ -500,7 +501,7 @@ class TionApi:
                 if response.status_code == 401:
                     _LOGGER.info("Need to get new authorisation")
                     if self._get_authorization():
-                        return self.get_data()
+                        return self.get_data(force=True)
                     else:  # pragma: no cover
                         _LOGGER.error("Authorization failed!")
                         return False
@@ -804,9 +805,9 @@ def main():
 
     logging.basicConfig(level=logging.INFO)
 
-    # initialization api
+    # initialization api with no saving auth information (for test only)
     email, password = os.environ.get("TION_AUTH").split(',')
-    api = TionApi(email, password, save_auth=False)
+    api = TionApi(email, password, auth_fname=None)  # not saving auth information (for test only)
     # getting current co2 level from magicair
     magicair = api.get_devices(name_part="magic")[0]
     print(f"magicair.co2: {magicair.co2}")
@@ -819,11 +820,11 @@ def main():
     # setting breezer speed manually
     breezer.speed = 3
     assert breezer.send() is True, "Failed to send breezer data"
-    print(f"breezer.is_on: {breezer.is_on} breezer.speed: {breezer.speed}")
+    print(f"breezer.is_on: {breezer.is_on}, breezer.speed: {breezer.speed}")
     # setting air source to outside
     breezer.gate = 2
     assert breezer.send() is True, "Failed to send breezer data"
-    print(f"breezer.is_on: {breezer.is_on} breezer.speed: {breezer.speed} breezer.gate: {breezer.gate}")
+    print(f"breezer.is_on: {breezer.is_on}, breezer.speed: {breezer.speed}, breezer.gate: {breezer.gate}")
     # setting auto mode for breezer's zone
     breezer.zone.mode = "auto"
     assert breezer.zone.send() is True, "Failed to send zone data"
@@ -832,7 +833,7 @@ def main():
     breezer.speed_min_set = 3
     breezer.speed_max_set = 6
     assert breezer.send() is True, "Failed to send breezer data"
-    print(f"breezer.speed_min_set: {breezer.speed_min_set} breezer.speed_max_set: {breezer.speed_max_set}")
+    print(f"breezer.speed_min_set: {breezer.speed_min_set}, breezer.speed_max_set: {breezer.speed_max_set}")
 
 
 if __name__ == '__main__':
