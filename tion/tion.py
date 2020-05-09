@@ -415,7 +415,7 @@ class TionApi:
             self.authorization = None
             self._get_authorization()
         self._last_update = 0
-        self._data: Tion = None
+        self._data: Tion = []
         self.get_data()
 
 
@@ -435,7 +435,7 @@ class TionApi:
         }
 
     def __repr__(self):
-        return f"TionApi({self.authorization}, data={'Tion()' if self._data else None})"
+        return f"TionApi({self.authorization}, data=[] ({len(self._data)} items)"
 
     def _get_authorization(self):
         data = {
@@ -490,11 +490,13 @@ class TionApi:
         if not force and (time() - self._last_update) < self._min_update_interval:  # update only once per {min_update_interval} seconds
             return self._data is not None
         url = "https://api2.magicair.tion.ru/location"
-        self._data = None
+        self._data = []
         try:
             response = requests.get(url, headers=self.headers, timeout=10)
             if response.status_code == 200:
-                self._data: Tion = Tion(response.json()[0])
+                locations = response.json()
+                for location in locations:
+                    self._data.append(Tion(location))
                 self._last_update = time()
                 return True
             else:
@@ -515,13 +517,14 @@ class TionApi:
     def _get_zones_data(self, name_part: str=None, guid: str=None, force=False) -> list:
         result = []
         if self.get_data(force=force):
-            for zone in self._data.zones:
-                if any([
-                    not name_part and not guid,
-                    guid and zone.guid == guid,
-                    name_part and name_part.lower() in zone.name.lower()
-                        ]):
-                    result.append(zone)
+            for location in self._data:
+                for zone in location.zones:
+                    if any([
+                       not name_part and not guid,
+                       guid and zone.guid == guid,
+                       name_part and name_part.lower() in zone.name.lower()
+                    ]):
+                       result.append(zone)
         return result
 
     def get_zones(self, name_part: str=None, guid: str=None) -> list:
@@ -535,16 +538,17 @@ class TionApi:
         devices_data = []
         zones = []
         if self.get_data(force=force):
-            for zone in self._data.zones:
-                for device in zone.devices:
-                    if any([
-                            not name_part and not guid and not type,
-                            guid and device.guid == guid,
-                            name_part and name_part.lower() in device.name.lower(),
-                            type and type.lower() in device.type.lower()
-                           ]):
-                        devices_data.append(device)
-                        zones.append(zone)
+            for location in self._data:
+                for zone in location.zones:
+                    for device in zone.devices:
+                        if any([
+                                not name_part and not guid and not type,
+                                guid and device.guid == guid,
+                                name_part and name_part.lower() in device.name.lower(),
+                                type and type.lower() in device.type.lower()
+                               ]):
+                            devices_data.append(device)
+                            zones.append(zone)
         return devices_data, zones
 
     def get_devices(self, name_part: str=None, guid: str=None, type: str=None) -> list:
