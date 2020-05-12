@@ -66,7 +66,7 @@ def test_zone_properties_and_repr(zone: Zone):
 
 
 def test_zone_not_send_if_not_valid(zone: Zone):
-    zone.target_co2 = None
+    zone._guid = None
     assert zone.send() is False, "Should'nt have sent not valid zone!"
     sleep(TESTS_DELAY)  # let the server "rest"
 
@@ -110,7 +110,7 @@ def test_breezer_properties_and_repr(breezer: Breezer):
 
 
 def test_breezer_not_send_if_not_valid(breezer: Breezer):
-    breezer.speed = None
+    breezer._guid = None
     assert breezer.send() is False, "Should'nt have sent not valid breezer!"
     sleep(TESTS_DELAY)  # let the server "rest"
 

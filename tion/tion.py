@@ -599,7 +599,7 @@ class Zone:
             return False
         data = {
             "mode": self.mode if self.mode in ("auto", "manual") else "manual",
-            "co2": int(self.target_co2)
+            "co2": int(self.target_co2) if self.target_co2 is not None else 900
         }
         url = f"https://api2.magicair.tion.ru/zone/{self.guid}/mode"
         try:
@@ -617,7 +617,7 @@ class Zone:
 
     @property
     def valid(self):
-        return None not in [value for __, value in self.__dict__.items()]
+        return self._guid is not None
 
 
 class MagicAir(TionZonesDevices):
@@ -656,7 +656,7 @@ class MagicAir(TionZonesDevices):
 
     @property
     def valid(self):
-        return None not in [value for __, value in self.__dict__.items()]
+        return self.guid is not None
 
     def load(self, device_data: TionZonesDevices=None, force=False):
         if not device_data:
@@ -746,14 +746,14 @@ class Breezer(TionZonesDevices):
     def send(self) -> bool:
         if not self.valid:
             return False
-        speed = int(self.speed + 0.5)
+        speed = int(self.speed + 0.5) if self.speed is not None else 0
         data = {
             "is_on": True if speed > 0 else False,
-            "heater_enabled": bool(self.heater_enabled),
-            "t_set": int(self.t_set + 0.5),
+            "heater_enabled": bool(self.heater_enabled) if self.heater_enabled is not None else False,
+            "t_set": int(self.t_set + 0.5) if self.t_set is not None else 10,
             "speed": speed if speed > 0 else 1,
-            "speed_min_set": int(self.speed_min_set + 0.5),
-            "speed_max_set": int(self.speed_max_set + 0.5)
+            "speed_min_set": int(self.speed_min_set + 0.5) if self.speed_min_set is not None else 0,
+            "speed_max_set": int(self.speed_max_set + 0.5) if self.speed_max_set is not None else 6
         }
         if self.zone.mode == "manual" and self.gate is not None:
             data["gate"] = self.gate
@@ -773,7 +773,7 @@ class Breezer(TionZonesDevices):
 
     @property
     def valid(self):
-        return None not in [value for __, value in self.__dict__.items()] and self._data_valid
+        return self.guid is not None
 
     def load(self, device_data: TionZonesDevices=None, force=False):
         if not device_data:
