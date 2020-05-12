@@ -557,8 +557,10 @@ class TionApi:
         for device_data, zone in zip(devices_data, zones):
             if "co2" in device_data.type:
                 result.append(MagicAir(device_data, zone, self))
-            elif "breezer" in device_data.type:
+            elif "breezer" in device_data.type or "O2" in device_data.type:
                 result.append(Breezer(device_data, zone, self))
+            else:  # pragma: no cover
+                _LOGGER.warning(f"Unknown device type: {device_data.type}, contact the developer for support with data:\n{device_data}")
         return result
 
 
@@ -656,7 +658,7 @@ class MagicAir(TionZonesDevices):
 
     @property
     def valid(self):
-        return self.guid is not None
+        return self._guid is not None
 
     def load(self, device_data: TionZonesDevices=None, force=False):
         if not device_data:
