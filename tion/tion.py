@@ -554,13 +554,17 @@ class TionApi:
     def get_devices(self, name_part: str=None, guid: str=None, type: str=None) -> list:
         devices_data, zones = self._get_devices_data(name_part, guid, type)
         result = []
+        #print(f"device_data: {device_data}")
         for device_data, zone in zip(devices_data, zones):
             if "co2" in device_data.type:
                 result.append(MagicAir(device_data, zone, self))
             elif "breezer" in device_data.type or "O2" in device_data.type:
                 result.append(Breezer(device_data, zone, self))
+            elif "danfossEco" in device_data.type:
+                result.append(Thermostat(device_data, zone, self))                
             else:  # pragma: no cover
-                _LOGGER.warning(f"Unknown device type: {device_data.type}, contact the developer for support with data:\n{device_data}")
+                #_LOGGER.warning
+                print(f"Unknown device type: {device_data.type}, contact the developer for support with data:\n{device_data}")
         return result
 
 
@@ -804,12 +808,65 @@ class Breezer(TionZonesDevices):
         return self.valid
 
 
+class Thermostat(TionZonesDevices):
+    def __init__(self, device: TionZonesDevices, zone_data: TionZones, api: TionApi):
+        self._name = device.name
+        self._guid = device.guid
+        self.zone: Zone = Zone(zone_data, api)
+        self._api: TionApi = api
+        self._temperature = None
+        self._is_on = None
+        self.t_set = None
+        self.load(device)
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def guid(self):
+        return self._guid
+
+    @property
+    def temperature(self):
+        return self._temperature
+
+    @property
+    def data_valid(self):
+        return self._data_valid
+
+    @property
+    def is_on(self):
+        return self._is_on
+
+    def __repr__(self):
+        return f"Thermostat({self.name}, valid = {self.valid})"
+        
+    @property
+    def valid(self):
+        return self.guid is not None
+
+    def load(self, device_data: TionZonesDevices=None, force=False):
+        if not device_data:
+            devices, _ = self._api._get_devices_data(guid=self._guid, force=force)
+            if devices:
+                device_data = devices[0]
+        if device_data:
+            data: TionZonesDevicesData = device_data.data
+            self._guid = device_data.guid
+            self._name = device_data.name
+            self._data_valid = data.data_valid
+            self._is_on = data.is_on
+            self.t_set = data.t_set
+            self._temperature = data.temperature
+        return self.valid
+
 def main():
     import os
     import logging
-    from tion import TionApi, Breezer, Zone, MagicAir
+    from tion import TionApi, Breezer, Zone, MagicAir, Thermostat
 
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
 
     # initialization api with no saving auth information (for test only)
     email, password = os.environ.get("TION_AUTH").split(',')
