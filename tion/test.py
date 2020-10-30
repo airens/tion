@@ -8,14 +8,20 @@ logging.basicConfig(level=logging.DEBUG)
 email = "chainstain@mail.ru"
 password = "123242_tion"
 api = TionApi(email, password, auth_fname=None)
-# getting current co2 level from magicair
 magicair = api.get_devices(name_part="magic")[0]
-print(f"magicair.co2: {magicair.co2}")
-# getting breezer
-#breezer = api.get_devices(name_part="breezer")[0]
-#print(f"breezer: {breezer}")
-#print(f"breezer: {breezer.zone.mode}")
+breezer = api.get_devices(name_part="breezer")[0]
 thermostat = api.get_devices(name_part="danfoss")[0]
-print(f"thermostat: {thermostat}")
-print(f"thermostat: {thermostat.temperature}")
+print(f"--breezer: {breezer}")
+print(f"--breezer: {breezer.zone.mode}")
+print(f"--magicair: {magicair}")
+print(f"--magicair: {magicair.co2}")
+print(f"--thermostat: {thermostat}")
+print(f"--thermostat: name {thermostat.name}")
+print(f"--thermostat: temperature {thermostat.temperature}")
+print(f"--thermostat: t_set {thermostat.t_set}")
 #print(f"thermostat: {thermostat.t_set}")
+
+#thermostat.t_set = 25
+#assert thermostat.send() is True, "Failed to send thermostat data"
+#print(f"--thermostat: temperature {thermostat.temperature}")
+#print(f"--thermostat: t_set {thermostat.t_set}")

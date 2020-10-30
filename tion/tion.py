@@ -317,6 +317,7 @@ class TionZonesDevices:
         self.t_max = data.get("t_max")  # 30.0
         self.t_min = data.get("t_min")  #
 
+
     def __repr__(self):  # pragma: no cover
         return f"""TionZonesDevices
         guid = {self.guid}
@@ -554,14 +555,15 @@ class TionApi:
     def get_devices(self, name_part: str=None, guid: str=None, type: str=None) -> list:
         devices_data, zones = self._get_devices_data(name_part, guid, type)
         result = []
-        #print(f"device_data: {device_data}")
+        #for device_data, zone in zip(devices_data, zones):
+            #print(f"device_data: {device_data.type} {device_data.guid} {device_data.name}")
         for device_data, zone in zip(devices_data, zones):
-            if "co2" in device_data.type:
+            if "danfoss" in device_data.type:
+                result.append(Thermostat(device_data, zone, self))    
+            elif "co2mb" in device_data.type:
                 result.append(MagicAir(device_data, zone, self))
             elif "breezer" in device_data.type or "O2" in device_data.type:
                 result.append(Breezer(device_data, zone, self))
-            elif "danfossEco" in device_data.type:
-                result.append(Thermostat(device_data, zone, self))                
             else:  # pragma: no cover
                 #_LOGGER.warning
                 print(f"Unknown device type: {device_data.type}, contact the developer for support with data:\n{device_data}")
@@ -670,6 +672,7 @@ class MagicAir(TionZonesDevices):
             if devices:
                 device_data = devices[0]
         if device_data:
+            #print (f"load MagicAir: {device_data.data}")
             data: TionZonesDevicesData = device_data.data
             self._guid = device_data.guid
             self._name = device_data.name
@@ -787,6 +790,7 @@ class Breezer(TionZonesDevices):
             if devices:
                 device_data = devices[0]
         if device_data:
+            #print (f"load Breezer: {device_data.data}")
             data: TionZonesDevicesData = device_data.data
             self._guid = device_data.guid
             self._name = device_data.name
@@ -846,12 +850,34 @@ class Thermostat(TionZonesDevices):
     def valid(self):
         return self.guid is not None
 
+    def send(self) -> bool:
+        if not self.valid:
+            return False
+        data = {
+            "t_set": int(self.t_set + 0.5) if self.t_set is not None else 16,
+        }
+        url = f"https://api2.magicair.tion.ru/device/{self._guid}/mode"
+        try:
+            js = requests.post(url, json=data, headers=self._api.headers, timeout=10)
+        except requests.exceptions.RequestException as e:  # pragma: no cover
+            _LOGGER.error(f"Exception while sending new thermostat data!:\n{e}")  # pragma: no cover
+            return False  # pragma: no cover
+        js = js.json()
+        status = js["status"]
+        if status != "queued":
+            _LOGGER.error("TionApi parameters set " + status + ": " + js["description"])  # pragma: no cover
+            return False  # pragma: no cover
+        else:
+            return self._api.wait_for_task(js["task_id"])
+
+
     def load(self, device_data: TionZonesDevices=None, force=False):
         if not device_data:
             devices, _ = self._api._get_devices_data(guid=self._guid, force=force)
             if devices:
                 device_data = devices[0]
         if device_data:
+            #print (f"load Thermostat: {device_data.data}")
             data: TionZonesDevicesData = device_data.data
             self._guid = device_data.guid
             self._name = device_data.name
@@ -897,7 +923,6 @@ def main():
     breezer.speed_max_set = 6
     assert breezer.send() is True, "Failed to send breezer data"
     print(f"breezer.speed_min_set: {breezer.speed_min_set}, breezer.speed_max_set: {breezer.speed_max_set}")
-
 
 if __name__ == '__main__':
     main()  # pragma: no cover
