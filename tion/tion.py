@@ -555,8 +555,6 @@ class TionApi:
     def get_devices(self, name_part: str=None, guid: str=None, type: str=None) -> list:
         devices_data, zones = self._get_devices_data(name_part, guid, type)
         result = []
-        #for device_data, zone in zip(devices_data, zones):
-            #print(f"device_data: {device_data.type} {device_data.guid} {device_data.name}")
         for device_data, zone in zip(devices_data, zones):
             if "danfoss" in device_data.type:
                 result.append(Thermostat(device_data, zone, self))    
