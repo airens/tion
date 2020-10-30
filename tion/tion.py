@@ -563,8 +563,7 @@ class TionApi:
             elif "breezer" in device_data.type or "O2" in device_data.type:
                 result.append(Breezer(device_data, zone, self))
             else:  # pragma: no cover
-                #_LOGGER.warning
-                print(f"Unknown device type: {device_data.type}, contact the developer for support with data:\n{device_data}")
+                _LOGGER.warning(f"Unknown device type: {device_data.type}, contact the developer for support with data:\n{device_data}")
         return result
 
 
@@ -670,7 +669,6 @@ class MagicAir(TionZonesDevices):
             if devices:
                 device_data = devices[0]
         if device_data:
-            #print (f"load MagicAir: {device_data.data}")
             data: TionZonesDevicesData = device_data.data
             self._guid = device_data.guid
             self._name = device_data.name
@@ -788,7 +786,6 @@ class Breezer(TionZonesDevices):
             if devices:
                 device_data = devices[0]
         if device_data:
-            #print (f"load Breezer: {device_data.data}")
             data: TionZonesDevicesData = device_data.data
             self._guid = device_data.guid
             self._name = device_data.name
@@ -875,7 +872,6 @@ class Thermostat(TionZonesDevices):
             if devices:
                 device_data = devices[0]
         if device_data:
-            #print (f"load Thermostat: {device_data.data}")
             data: TionZonesDevicesData = device_data.data
             self._guid = device_data.guid
             self._name = device_data.name
@@ -890,7 +886,7 @@ def main():
     import logging
     from tion import TionApi, Breezer, Zone, MagicAir, Thermostat
 
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
 
     # initialization api with no saving auth information (for test only)
     email, password = os.environ.get("TION_AUTH").split(',')
