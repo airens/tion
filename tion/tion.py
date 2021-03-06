@@ -775,7 +775,7 @@ class Breezer(TionZonesDevices):
 
     @property
     def valid(self):
-        return self.guid is not None
+        return self.guid is not None and self.data_valid
 
     def load(self, device_data: TionZonesDevices=None, force=False):
         if not device_data:
