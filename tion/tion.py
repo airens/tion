@@ -745,13 +745,14 @@ class Breezer(TionZonesDevices):
     def __repr__(self):
         return f"Breezer({self.name}, valid = {self.valid})"
 
-    def send(self) -> bool:
+    def send(self, extra_data: dict = None) -> bool:
         if not self.valid:
             return False
         speed = int(self.speed + 0.5) if self.speed is not None else 0
         data = {
             "is_on": True if speed > 0 else False,
             "heater_enabled": bool(self.heater_enabled) if self.heater_enabled is not None else False,
+            "heater_mode": "maintenance",  # 4S model support
             "t_set": int(self.t_set + 0.5) if self.t_set is not None else 10,
             "speed": speed if speed > 0 else 1,
             "speed_min_set": int(self.speed_min_set + 0.5) if self.speed_min_set is not None else 0,
@@ -759,6 +760,8 @@ class Breezer(TionZonesDevices):
         }
         if self.zone.mode == "manual" and self.gate is not None:
             data["gate"] = self.gate
+        if extra_data is not None:
+            data = {**data, **extra_data}
         url = f"https://api2.magicair.tion.ru/device/{self._guid}/mode"
         try:
             js = requests.post(url, json=data, headers=self._api.headers, timeout=10)
@@ -825,7 +828,7 @@ def main():
     print(f"breezer.zone.mode: {breezer.zone.mode}")
     # setting breezer speed manually
     breezer.speed = 3
-    assert breezer.send() is True, "Failed to send breezer data"
+    assert breezer.send({"heater_mode": "maintenance"}) is True, "Failed to send breezer data"
     print(f"breezer.is_on: {breezer.is_on}, breezer.speed: {breezer.speed}")
     # setting air source to outside
     breezer.gate = 2

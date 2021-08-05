@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.23] - 2021-08-05
+### Added
+- ability to test some new breezer.send() data options with 'extra_data' param
+- added support for 4S model ('heater_mode' parameter is now being sent)
 ## [1.22] - 2020-05-09
 ### Fixed
 - breezer's valid property is now also checks data_valid  
