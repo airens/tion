@@ -792,6 +792,8 @@ class Breezer(TionZonesDevices):
             self._data_valid = data.data_valid
             self._is_on = data.is_on
             self._heater_installed = data.heater_installed
+            if self._heater_installed is None and "4S" in self._name:  # 4S does not give that for some reason
+                self._heater_installed = True
             self.heater_enabled = data.heater_enabled
             self.t_set = data.t_set
             self.speed = data.speed if self._is_on else 0  # Tion gives speed 1 even if it's off
