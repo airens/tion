@@ -508,7 +508,7 @@ class TionApi:
                         _LOGGER.error("Authorization failed!")
                         return False
                 else:  # pragma: no cover
-                    _LOGGER.warning(f"Status code while getting data is {response.status_code}, content:\n{response.json()}!")
+                    _LOGGER.debug(f"Status code while getting data is {response.status_code}, content:\n{response.json()}!")
                     return False
         except requests.exceptions.RequestException as e:  # pragma: no cover
             _LOGGER.error(f"Exception while getting data!\n{e}")
@@ -560,7 +560,7 @@ class TionApi:
             elif "breezer" in device_data.type or "O2" in device_data.type:
                 result.append(Breezer(device_data, zone, self))
             else:  # pragma: no cover
-                _LOGGER.warning(f"Unknown device type: {device_data.type}, contact the developer for support with data:\n{device_data}")
+                _LOGGER.error(f"Unknown device type: {device_data.type}, contact the developer for support with data:\n{device_data}")
         return result
 
 
