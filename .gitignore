@@ -3,4 +3,5 @@ build/
 dist/
 tion.egg-info/
 tion/__pycache__/
-tests/tion_auth
+*tion_auth
+local_build

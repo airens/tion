@@ -240,6 +240,7 @@ class TionZonesDevicesData:
         self.data_valid = data.get("data_valid")  # True
         self.heater_installed = data.get("heater_installed")  # True
         self.heater_enabled = data.get("heater_enabled")  # True
+        self.heater_mode = data.get("heater_mode")  # "maintanance" (off), "heat" (on)
         self.speed = data.get("speed")  # 1.0
         self.speed_m3h = data.get("speed_m3h")  #
         self.speed_max_set = data.get("speed_max_set")  # 2
@@ -276,6 +277,7 @@ class TionZonesDevicesData:
         data_valid = {self.data_valid}
         heater_installed = {self.heater_installed}
         heater_enabled = {self.heater_enabled}
+        heater_mode = {self.heater_mode}
         speed = {self.speed}
         speed_m3h = {self.speed_m3h}
         speed_max_set = {self.speed_max_set}
@@ -749,10 +751,11 @@ class Breezer(TionZonesDevices):
         if not self.valid:
             return False
         speed = int(self.speed + 0.5) if self.speed is not None else 0
+        heater_enabled = bool(self.heater_enabled) if self.heater_enabled is not None else False
         data = {
             "is_on": True if speed > 0 else False,
-            "heater_enabled": bool(self.heater_enabled) if self.heater_enabled is not None else False,
-            "heater_mode": "maintenance",  # 4S model support
+            "heater_enabled": heater_enabled,
+            "heater_mode": "heat" if heater_enabled else "maintenance",  # 4S model support
             "t_set": int(self.t_set + 0.5) if self.t_set is not None else 10,
             "speed": speed if speed > 0 else 1,
             "speed_min_set": int(self.speed_min_set + 0.5) if self.speed_min_set is not None else 0,
@@ -795,6 +798,8 @@ class Breezer(TionZonesDevices):
             if self._heater_installed is None and "4S" in self._name:  # 4S does not give that for some reason
                 self._heater_installed = True
             self.heater_enabled = data.heater_enabled
+            if self.heater_enabled is None:
+                self.heater_enabled = True if data.heater_mode == "heat" else False
             self.t_set = data.t_set
             self.speed = data.speed if self._is_on else 0  # Tion gives speed 1 even if it's off
             self.speed_min_set = data.speed_min_set

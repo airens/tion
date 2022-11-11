@@ -5,6 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.28] - 2022-11-11
+### Fixed
+- Обновлена работа с 4S. Параметр `heater_enabled` теперь формируется из `heater_mode`
 ## [1.27] - 2022-11-10
 ### Fixed
 - Для модели 4S теперь принудительно выставляется `heater_enabled`
