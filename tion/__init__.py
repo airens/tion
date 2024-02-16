@@ -1,1 +1,1 @@
-from tion.tion import TionApi, Breezer, Zone, MagicAir, main
+from tion.tion import TionApi, Breezer, Zone, MagicAir, ZonePreset, main

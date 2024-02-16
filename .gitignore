@@ -5,3 +5,4 @@ tion.egg-info/
 tion/__pycache__/
 *tion_auth
 local_build
+/venv

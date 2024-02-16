@@ -1,10 +1,48 @@
-import requests
 import logging
 from os import path
+from threading import Timer
 from time import time, sleep
+from typing import Any
 
+import requests
 
 _LOGGER = logging.getLogger("tion")
+
+BREEZER_GATES = {
+    "breezer3": {
+        "values": {
+            "inside": 0,
+            "combined": 1,
+            "outside": 2
+        },
+        "codes": ["inside", "combined", "outside"]
+    },
+    "breezer4": {
+        "values": {
+            "inside": 1,
+            "outside": 0
+        },
+        "codes": ["outside", "inside"]
+    }
+}
+
+
+def debounce(wait):  # https://gist.github.com/walkermatt/2871026
+    """ Decorator that will postpone a functions
+        execution until after wait seconds
+        have elapsed since the last time it was invoked. """
+    def decorator(fn):
+        def debounced(*args, **kwargs):
+            def call_it():
+                fn(*args, **kwargs)
+            try:
+                debounced.t.cancel()
+            except AttributeError:
+                pass
+            debounced.t = Timer(wait, call_it)
+            debounced.t.start()
+        return debounced
+    return decorator
 
 
 class TionConnection:
@@ -155,6 +193,66 @@ class TionZonesSensorsAverage:
         """
 
 
+class TionZonesPresetsClimateSettings:
+    def __init__(self, data: dict):
+        self.mode = data.get("mode")
+        self.co2 = data.get("co2")
+
+    def __repr__(self):  # pragma: no cover
+        return f"""TionZonesPresetsClimateSettings
+        mode = {self.mode}
+        co2 = {self.co2}
+        """
+
+
+class TionZonesPresetsDevices:
+    def __init__(self, data: dict):
+        self.id = data.get("id")
+        self.speed = data.get("speed")
+        self.speed_max_set = data.get("speed_max_set")
+        self.speed_min_set = data.get("speed_min_set")
+        self.t_set = data.get("t_set")
+        self.is_on = data.get("is_on")
+        self.gate = data.get("gate")
+        self.heater_mode = data.get("heater_mode")
+        self.heater_enabled = data.get("heater_enabled")
+
+    def __repr__(self):  # pragma: no cover
+        return f"""TionZonesPresetsDevices
+        id = {self.id}
+        speed = {self.speed}
+        speed_max_set = {self.speed_max_set}
+        speed_min_setv = {self.speed_min_set}
+        t_set = {self.t_set}
+        is_on = {self.is_on}
+        gate = {self.gate}
+        heater_mode = {self.heater_mode}
+        heater_enabled = {self.heater_enabled}
+        """
+
+
+class TionZonesPresets:
+    def __init__(self, data: dict, index: int):
+        self.guid = data.get("guid")
+        self.name = data.get("name")
+        self.index = index
+        self.icon = data.get("icon")
+        self.climate_settings = TionZonesPresetsClimateSettings(data.get("climate_settings"))
+        self.devices = []
+        for item in data.get("devices", []):
+            self.devices.append(TionZonesPresetsDevices(item))
+
+    def __repr__(self):  # pragma: no cover
+        return f"""TionZonesPresets
+        guid = {self.guid}
+        name = {self.name}
+        index = {self.index}
+        icon = {self.icon}
+        climate_settings = {self.climate_settings}
+        devices = {self.devices}
+        """
+
+
 class TionZones:
     def __init__(self, data: dict):
         self.guid = data.get("guid")  # edf54e75-9a3a-4cf4-9265-808be2d0e5e9
@@ -176,6 +274,11 @@ class TionZones:
         self.creation_time = data.get("creation_time")  # 1551781651
         self.update_time_iso = data.get("update_time_iso")  # 2019-03-05T10:27:31.7207231Z
         self.update_time = data.get("update_time")  # 1551781651
+        self.presets = []
+        i = 0
+        for item in data.get("__presets", []):
+            self.presets.append(TionZonesPresets(item, index=i))
+            i += 1
 
     def __repr__(self):  # pragma: no cover
         return f"""TionZones
@@ -194,6 +297,7 @@ class TionZones:
         creation_time = {self.creation_time}
         update_time_iso = {self.update_time_iso}
         update_time = {self.update_time}
+        presets = {self.presets}
         """
 
 
@@ -488,33 +592,48 @@ class TionApi:
         _LOGGER.warning(f"Couldn't get completed status for {max_time}sec in wait_for_task")  # pragma: no cover
         return False  # pragma: no cover
 
+    def _get_url_response(self, url):
+        cnt = 2
+        while cnt > 0:
+            try:
+                _LOGGER.debug(f"request: GET {url}")
+                response = requests.get(url, headers=self.headers, timeout=10)
+                if response.status_code == 200:
+                    return response.json()
+                else:
+                    if response.status_code == 401:
+                        _LOGGER.info("Need to get new authorisation")
+                        if self._get_authorization():
+                            cnt -= 1
+                        else:  # pragma: no cover
+                            _LOGGER.error("Authorization failed!")
+                            return None
+                    else:  # pragma: no cover
+                        _LOGGER.debug(f"Status code while getting data is {response.status_code}, content:\n{response.json()}!")
+                        return None
+            except requests.exceptions.RequestException as e:  # pragma: no cover
+                _LOGGER.error(f"Exception while getting data!\n{e}")
+                return None
+
     def get_data(self, force=False) -> bool:
         if not force and (time() - self._last_update) < self._min_update_interval:  # update only once per {min_update_interval} seconds
             return self._data is not None
-        url = "https://api2.magicair.tion.ru/location"
+
         self._data = []
-        try:
-            response = requests.get(url, headers=self.headers, timeout=10)
-            if response.status_code == 200:
-                locations = response.json()
-                for location in locations:
-                    self._data.append(Tion(location))
-                self._last_update = time()
-                return True
-            else:
-                if response.status_code == 401:
-                    _LOGGER.info("Need to get new authorisation")
-                    if self._get_authorization():
-                        return self.get_data(force=True)
-                    else:  # pragma: no cover
-                        _LOGGER.error("Authorization failed!")
-                        return False
-                else:  # pragma: no cover
-                    _LOGGER.debug(f"Status code while getting data is {response.status_code}, content:\n{response.json()}!")
-                    return False
-        except requests.exceptions.RequestException as e:  # pragma: no cover
-            _LOGGER.error(f"Exception while getting data!\n{e}")
-            return False
+        locations = self._get_url_response("https://api2.magicair.tion.ru/location")
+        if locations is not None:
+            for location in locations:
+                for z in location.get("zones", []):
+                    if not z.get("is_virtual"):
+                        zone_guid = z['guid']
+                        presets = self._get_url_response(f"https://api2.magicair.tion.ru/preset/{zone_guid}")
+                        if presets is not None:
+                            z["__presets"] = presets
+                self._data.append(Tion(location))
+            self._last_update = time()
+            return True
+
+        return False
 
     def _get_zones_data(self, name_part: str=None, guid: str=None, force=False) -> list:
         result = []
@@ -534,6 +653,29 @@ class TionApi:
         result = []
         for zone_data in zones_data:
             result.append(Zone(zone_data, self))
+        return result
+
+    def _get_zone_presets_data(self, name_part: str = None, guid: str = None, force=False) -> tuple[list, list]:
+        presets_data = []
+        zones = []
+        if self.get_data(force=force):
+            for location in self._data:
+                for zone in location.zones:
+                    for preset in zone.presets:
+                        if any([
+                                not name_part and not guid,
+                                guid and preset.guid == guid,
+                                name_part and name_part.lower() in preset.name.lower(),
+                               ]):
+                            presets_data.append(preset)
+                            zones.append(zone)
+        return presets_data, zones
+
+    def get_zone_presets(self, name_part: str = None, guid: str = None) -> list:
+        presets_data, zones = self._get_zone_presets_data(name_part, guid)
+        result = []
+        for preset_data, zone in zip(presets_data, zones):
+            result.append(ZonePreset(preset_data, zone, self))
         return result
 
     def _get_devices_data(self, name_part: str=None, guid: str=None, type: str=None, force=False) -> list:
@@ -628,7 +770,13 @@ class MagicAir(TionZonesDevices):
     def __init__(self, device: TionZonesDevices, zone_data: TionZones, api: TionApi):
         self._name = device.name
         self._guid = device.guid
+        self.mac = device.mac
+        self.mac_long = device.mac_long
+        self.type = device.type
+        self.firmware = device.firmware
+        self.hardware = device.hardware
         self._zone: Zone = Zone(zone_data, api)
+        self.room = self._zone.name
         self._api: TionApi = api
         self._co2 = None
         self._temperature = None
@@ -681,7 +829,13 @@ class Breezer(TionZonesDevices):
     def __init__(self, device: TionZonesDevices, zone_data: TionZones, api: TionApi):
         self._name = device.name
         self._guid = device.guid
+        self.mac = device.mac
+        self.mac_long = device.mac_long
+        self.type = device.type
+        self.firmware = device.firmware
+        self.hardware = device.hardware
         self.zone: Zone = Zone(zone_data, api)
+        self.room = self.zone.name
         self._api: TionApi = api
         self._t_in = None
         self._t_out = None
@@ -795,7 +949,7 @@ class Breezer(TionZonesDevices):
             self._data_valid = data.data_valid
             self._is_on = data.is_on
             self._heater_installed = data.heater_installed
-            if self._heater_installed is None and "4S" in self._name:  # 4S does not give that for some reason
+            if self._heater_installed is None and "breezer4" in self.type:  # 4S does not give that for some reason
                 self._heater_installed = True
             self.heater_enabled = data.heater_enabled
             if self.heater_enabled is None:
@@ -812,6 +966,147 @@ class Breezer(TionZonesDevices):
             self._t_max = device_data.t_max
             self._t_min = device_data.t_min
         return self.valid
+
+
+class ZonePreset:
+    _api: TionApi
+    _zone: Zone
+    room: str
+    _devices: list[TionZonesPresetsDevices]
+    _device_id: str
+    _device: Breezer
+    _guid: str
+    name: str
+    index: int
+    _icon: int
+    mode: str
+    co2: float
+    speed: float
+    speed_max_set: float
+    speed_min_set: float
+    t_set: float
+    is_on: bool
+    gate: str
+    heater_enabled: bool
+
+    def __init__(self, preset: TionZonesPresets, zone_data: TionZones, api: TionApi):
+        self._api: TionApi = api
+        self._zone: Zone = Zone(zone_data, api)
+        self.load(preset, zone_data)
+
+    def __repr__(self):  # pragma: no cover
+        return f"""ZonePreset
+        room = {self.room}
+        guid = {self.guid}
+        name = {self.name}
+        index = {self.index}
+        icon = {self._icon}
+        mode = {self.mode}
+        co2 = {self.co2}
+        device = {self._device_id}
+        speed = {self.speed}
+        speed_max_set = {self.speed_max_set}
+        speed_min_set = {self.speed_min_set}
+        t_set = {self.t_set}
+        is_on = {self.is_on}
+        gate = {self.gate}
+        heater_enabled = {self.heater_enabled}
+        """
+
+    @property
+    def guid(self):
+        return self._guid
+
+    @property
+    def valid(self):
+        return self._guid is not None
+
+    def load(self, preset_data: TionZonesPresets=None, zone_data: TionZones=None, force=False):
+        if not preset_data:
+            presets, zone = self._api._get_zone_presets_data(guid=self.guid, force=force)
+            if presets:
+                preset_data = presets[0]
+                zone_data = zone[0]
+        if preset_data:
+            self._zone: Zone = Zone(zone_data, self._api)
+            self.room = self._zone.name
+            self._devices = preset_data.devices
+            self._device_id = preset_data.devices[0].id
+            self._device = self._api.get_devices(guid=self._device_id)[0]
+            self._guid = preset_data.guid
+            self._icon = preset_data.icon
+            self.name = preset_data.name
+            self.index = preset_data.index
+            self.mode = preset_data.climate_settings.mode
+            self.co2 = preset_data.climate_settings.co2
+            self.speed = preset_data.devices[0].speed
+            self.speed_max_set = preset_data.devices[0].speed_max_set
+            self.speed_min_set = preset_data.devices[0].speed_min_set
+            self.t_set = preset_data.devices[0].t_set
+            self.is_on = preset_data.devices[0].is_on
+            self.gate = BREEZER_GATES.get(self._device.type).get("codes")[preset_data.devices[0].gate]
+            if not self.is_on:  # if MANUAL mode AND breezer turned off "speed" always 0
+                self.speed = 1
+            if self._device.type == "breezer3":
+                self.heater_enabled = preset_data.devices[0].heater_enabled
+            elif self._device.type == "breezer4":
+                self.heater_enabled = preset_data.devices[0].heater_mode == "heat"
+        return self.valid
+
+    @debounce(5)
+    def send(self) -> bool:
+        return self._send()
+
+    def send_sync(self) -> bool:
+        return self._send()
+
+    def _send(self) -> bool:
+        if not self.valid:
+            return False
+
+        gates = BREEZER_GATES.get(self._device.type).get("values")
+        first_device = {
+            "id": self._device_id,
+            "speed": self.speed if self.is_on else 0,
+            "speed_max_set": self.speed_max_set,
+            "speed_min_set": self.speed_min_set,
+            "t_set": self.t_set,
+            "is_on": self.is_on,
+            "gate": gates.get(self.gate, gates.get('inside')),
+        }
+        if self._device.type == "breezer3":
+            first_device["heater_enabled"] = self.heater_enabled
+        elif self._device.type == "breezer4":
+            first_device["heater_mode"] = "heat" if self.heater_enabled else "maintenance"
+
+        devices = [first_device]
+        i = 1
+        while i < len(self._devices):
+            devices.append(self._devices[i])
+            i += 1
+
+        data = {
+            "name": self.name,
+            "icon": self._icon,
+            "climate_settings": {
+                "mode": self.mode,
+                "co2": self.co2,
+            },
+            "devices": devices,
+        }
+        _LOGGER.debug(f"update preset: {data}")
+        url = f"https://api2.magicair.tion.ru/preset/{self._zone.guid}?presetId={self._guid}"
+
+        try:
+            response = requests.put(url, json=data, headers=self._api.headers, timeout=10)
+        except requests.exceptions.RequestException as e:  # pragma: no cover
+            _LOGGER.error(f"Exception while sending new preset data!:\n{e}")  # pragma: no cover
+            return False  # pragma: no cover
+
+        if response.status_code != 200:  # pragma: no cover
+            _LOGGER.error(f"Status code while updating preset: {response.status_code}, content:\n{response.json()}!")
+
+        return response.status_code == 200
 
 
 def main():
@@ -850,6 +1145,14 @@ def main():
     breezer.speed_max_set = 6
     assert breezer.send() is True, "Failed to send breezer data"
     print(f"breezer.speed_min_set: {breezer.speed_min_set}, breezer.speed_max_set: {breezer.speed_max_set}")
+
+    presets = api.get_zone_presets()
+    print(f"presets: {presets}")
+
+    preset = presets[0]
+    preset.t_set = 15
+    preset.name = "Ночь"
+    assert preset.send() is True, "Failed to send preset data"
 
 
 if __name__ == '__main__':
